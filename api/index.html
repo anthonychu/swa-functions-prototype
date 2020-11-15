@@ -1,0 +1,85 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <input type="text" id="message" />
+  <button id="saveMessage">Save Message</button>
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@5.0.0/dist/browser/signalr.js"></script>
+  <script>
+    const apiBaseUrl = 'http://localhost:7071'
+
+    class SwaRealtime {
+      _events = []
+      _signalRConnection
+
+      on(eventName, fn) {
+        this._events.push({ eventName, fn })
+        return this
+      }
+
+      connect() {
+        this._signalRConnection = new signalR.HubConnectionBuilder()
+          .withUrl(`${apiBaseUrl}/api`)
+          .withAutomaticReconnect()
+          .build()
+        
+        for (let ev of this._events) {
+          this._signalRConnection.on(ev.eventName, ev.fn)
+        }
+
+        return this._signalRConnection.start()
+      }
+    }
+
+    const swa = {
+      functions: function(functionName) {
+        return {
+          invoke: async function(data) {
+            const body = { data: data }
+            const response = await fetch(`${apiBaseUrl}/api/${functionName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(body)
+            })
+            const responseBody = await response.json()
+            return responseBody.data
+          }
+        }
+      },
+      realtime: function () {
+        return new SwaRealtime()
+      }
+    }
+  </script>
+  <script>
+    // await swa.realtime
+    //   .on('message', function(message) {})
+    //   .connect()
+
+    (async function() {
+      const greeting = await swa.functions("greet").invoke("azure")
+      console.log(greeting)
+
+      await swa.realtime()
+        .on('message', (msg) => console.log("from websocket", msg))
+        .connect()
+    })()
+
+    document.getElementById('saveMessage').onclick = async function() {
+      const message = document.getElementById('message').value
+      const result = await swa.functions("saveMessage").invoke(message)
+      console.log(result)
+    }
+
+    // const user = await swa.auth().getLoggedInUser()
+    // const loginUrl = await swa.auth().getLoginUrl('github')
+    // const logoutUrl = await swa.auth().getLogoutUrl()
+
+  </script>
+</body>
+</html>
