@@ -65,15 +65,15 @@ class StaticWebAppsClient {
         } catch {
           return
         }
-      },
+      }.bind(this),
       loginUrl: function(provider) {
         // todo: add redirect url
         return `${this._apiBaseUrl}/.auth/login/${provider}`
-      },
+      }.bind(this),
       logoutUrl: function() {
         // todo: add redirect url
         return `${this._apiBaseUrl}/.auth/logout`
-      }
+      }.bind(this)
     }
   }
 }
