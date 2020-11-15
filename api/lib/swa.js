@@ -72,7 +72,7 @@ class HttpFunctionBuilder {
       context.res.json({
         data: result
       });
-    };
+    }.bind(this);
   }
 
   onRequest(fn) {
@@ -91,6 +91,10 @@ class HttpFunctionBuilder {
   allow(options) {
     this._authAllowOptions = options;
     return this;
+  }
+
+  allowAuthenticated() {
+    return this.allow({ roles: ['authenticated'] });
   }
 }
 
