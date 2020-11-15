@@ -3,12 +3,12 @@ const jwt = require('jsonwebtoken');
 
 const functions = {
   http() {
-      return new HttpFunctionBuilder();
+    return new HttpFunctionBuilder();
   }
 };
 
 class HttpFunctionBuilder {
-  authAllowOptions;
+  _authAllowOptions;
 
   _decodeAuthInfo(req) {
     // This block sets a development user that has rights to upload
@@ -20,9 +20,9 @@ class HttpFunctionBuilder {
         userRoles: ["admin", "anonymous", "authenticated"],
       };
     }
-  
+
     const clientPrincipalHeader = "x-ms-client-principal";
-  
+
     if (req.headers[clientPrincipalHeader] == null) {
       return null;
     }
@@ -30,28 +30,67 @@ class HttpFunctionBuilder {
     const serializedJson = buffer.toString("ascii");
     return JSON.parse(serializedJson);
   }
-  
+
+  _isAuthorized(authenticatedUser) {
+    if (!this._authAllowOptions) return true;
+
+    if (!authenticatedUser) return false;
+
+    if (this._authAllowOptions.roles) {
+      const matchingRoles = authenticatedUser.userRoles.filter(value => this._authAllowOptions.roles.includes(value));
+      if (matchingRoles.length > 0) {
+        return true;
+      }
+    }
+
+    if (this._authAllowOptions.users) {
+      if (this._authAllowOptions.users.includes(authenticatedUser.userDetails)) {
+        return true;
+      }
+    }
+
+    if (this._authAllowOptions.userIds) {
+      if (this._authAllowOptions.userIds.includes(authenticatedUser.userId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   onInvoke(fn) {
     return async function (context, req) {
-        const data = req.body.data;
-        // validate auth
-        const result = await Promise.resolve(fn(data, context));
-        context.res.json({
-            data: result
-        });
+      const data = req.body.data;
+      context.authenticatedUser = this._decodeAuthInfo(req);
+
+      if (!this._isAuthorized(context.authenticatedUser)) {
+        context.res = { status: context.authenticatedUser ? 403 : 401 };
+        return;
+      }
+
+      const result = await Promise.resolve(fn(data, context));
+      context.res.json({
+        data: result
+      });
     };
   }
 
   onRequest(fn) {
     return async function (context, req) {
-        await Promise.resolve(fn(req, context.res, context))
+      context.authenticatedUser = this._decodeAuthInfo(req);
+
+      if (!this._isAuthorized(context.authenticatedUser)) {
+        context.res = { status: context.authenticatedUser ? 403 : 401 };
+        return;
+      }
+
+      await Promise.resolve(fn(req, context.res, context))
     };
   }
 
   allow(options) {
-      this.authAllowOptions = options;
-      return this;
+    this._authAllowOptions = options;
+    return this;
   }
 }
 
@@ -111,9 +150,9 @@ class RealtimeBuilder {
   async send(eventName, data) {
     const hubUrl = `${this._endpoint}/api/v1/hubs/${this._defaultHubName}`;
     const accessToken = jwt.sign({
-        aud: hubUrl,
-        iat: Math.floor(Date.now() / 1000) - 30,
-        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+      aud: hubUrl,
+      iat: Math.floor(Date.now() / 1000) - 30,
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
     }, this._accessKey);
 
     const response = await fetch(hubUrl, {
@@ -124,7 +163,7 @@ class RealtimeBuilder {
       },
       body: JSON.stringify({
         target: eventName,
-        arguments: [ data ]
+        arguments: [data]
       })
     });
   }
@@ -140,10 +179,10 @@ class RealtimeBuilder {
       payload.userId = userId;
     }
     const accessToken = jwt.sign(payload, this._accessKey);
-    
+
     return {
-        accessToken,
-        url: hubUrl
+      accessToken,
+      url: hubUrl
     };
   }
 
