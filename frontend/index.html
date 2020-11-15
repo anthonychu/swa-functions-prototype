@@ -94,96 +94,70 @@
   <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@3.1.4/dist/browser/signalr.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/timeago.js@4.0.2/dist/timeago.min.js"></script>
+
   <script src="swa.js"></script>
 
   <script>
-    const apiBaseUrl = isLocal() ? 'http://localhost:7071' : ''
-
-    const swa = new StaticWebAppsClient(apiBaseUrl);
-
-    const data = {
-      username: '',
-      newMessage: '',
-      messages: [],
-      ready: false,
-      authenticatedUser: null,
-      interval: null
-    }
+    const swa = new StaticWebAppsClient()
 
     const app = new Vue({
       el: '#app',
-      data: data,
+
+      data() {
+        return {
+          username: '',
+          newMessage: '',
+          messages: [],
+          ready: false,
+          authenticatedUser: null,
+          interval: null
+        }
+      },
+
       methods: {
-        sendNewMessage: function () {
+        sendNewMessage() {
           swa.functions('sendMessage').invoke({ text: this.newMessage })
           this.newMessage = ''
         },
-        login: function() {
-          if (isLocal()) {
-            // fake login when local (not necessary if used with emulator)
-            localLogin()
-          } else {
-            location.href = swa.auth().loginUrl('github')
-          }
+
+        login() {
+          location.href = swa.auth().loginUrl('github')
         },
-        logout: function () {
-          if (isLocal()) {
-            // fake logout
-            localLogout()
-          } else {
-            location.href = swa.auth().logoutUrl()
-          }
+
+        logout() {
+          location.href = swa.auth().logoutUrl()
         },
-        onNewMessage: function(message) {
+        
+        onNewMessage(message) {
           message.timestamp = new Date(message._ts * 1000)
           message.ago = timeago.format(message.timestamp)
           this.messages.unshift(message)
         }
       },
-      mounted: async function () {
+
+      async mounted() {
         if (!this.interval) {
           this.interval = setInterval(function updateTimes() {
             this.messages.forEach(m => m.ago = timeago.format(m.timestamp))
           }.bind(this), 10000)
         }
 
-        this.authenticatedUser = await (isLocal() ? localGetUser() : swa.auth().user())
+        this.authenticatedUser = await swa.auth().user()
+
         if (this.authenticatedUser) {
           const messageHistory = await swa.functions('getMessages').invoke()
           for (const message of messageHistory.reverse()) {
             this.onNewMessage(message)
           }
+
           await swa.realtime()
             .on('newMessage', this.onNewMessage)
             .connect()
+
           this.ready = true
         }
       }
     })
-
-    function isLocal() {
-      return location.hostname === 'localhost'
-    }
-
-    function localLogin() {
-      sessionStorage.setItem('user', JSON.stringify({
-        identityProvider: 'github',
-        userId: '583231',
-        userDetails: 'octocat',
-        userRoles: ['admin', 'anonymous'],
-      }))
-      location.reload()
-    }
-
-    function localLogout() {
-      sessionStorage.removeItem('user')
-      location.reload()
-    }
-
-    function localGetUser() {
-      return Promise.resolve(JSON.parse(sessionStorage.getItem('user')))
-    }
-
   </script>
 </body>
 
