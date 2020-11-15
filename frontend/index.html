@@ -115,8 +115,8 @@
       },
 
       methods: {
-        sendNewMessage() {
-          swa.functions('sendMessage').invoke({ text: this.newMessage })
+        async sendNewMessage() {
+          await swa.functions('sendMessage').invoke({ text: this.newMessage })
           this.newMessage = ''
         },
 
@@ -127,7 +127,7 @@
         logout() {
           location.href = swa.auth().logoutUrl()
         },
-        
+
         onNewMessage(message) {
           message.timestamp = new Date(message._ts * 1000)
           message.ago = timeago.format(message.timestamp)
