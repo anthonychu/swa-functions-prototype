@@ -2,7 +2,7 @@ const { functions, database } = require('./lib/swa');
 const mail = require('@sendgrid/mail');
 mail.setApiKey(process.env.SENDGRID_API_KEY);
 
-module.exports = functions.http().allowAuthenticated().onRequest(async function(req, res) {
+module.exports = functions.http().allow(['anthonychu']).onRequest(async function (req, res) {
   const form = req.form;
   const msg = {
     to: 'antchu@microsoft.com',
