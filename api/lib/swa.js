@@ -1,3 +1,4 @@
+const Busboy = require('busboy');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 
@@ -29,6 +30,41 @@ class HttpFunctionBuilder {
     const buffer = Buffer.from(req.headers[clientPrincipalHeader], "base64");
     const serializedJson = buffer.toString("ascii");
     return JSON.parse(serializedJson);
+  }
+
+  _parseMultipartData(req) {
+    return new Promise(function (resolve, reject) {
+
+      const busboy = new Busboy({ headers: req.headers });
+      const form = {};
+
+      busboy.on('file', function (fieldname, file, filename, encoding, mimetype) {
+        const fieldData = [];
+        form[fieldname] = {
+          filename,
+          encoding,
+          mimetype
+        };
+
+        file.on('data', function (data) {
+          fieldData.push(...data);
+        });
+
+        file.on('end', function () {
+          form[fieldname].data = Buffer.from(fieldData);
+        });
+      });
+
+      busboy.on('field', function (fieldname, val) {
+        form[fieldname] = val;
+      });
+
+      busboy.on('finish', function () {
+        resolve(form);
+      });
+
+      busboy.write(req.body);
+    });
   }
 
   _isAuthorized(authenticatedUser) {
@@ -84,8 +120,12 @@ class HttpFunctionBuilder {
         return;
       }
 
+      if (req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/form-data')) {
+        req.form = await this._parseMultipartData(req);
+      }
+
       await Promise.resolve(fn(req, context.res, context))
-    };
+    }.bind(this);
   }
 
   allow(options) {

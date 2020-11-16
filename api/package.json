@@ -9,6 +9,8 @@
   "author": "",
   "dependencies": {
     "@azure/cosmos": "^3.9.3",
+    "@sendgrid/mail": "^7.4.0",
+    "busboy": "^0.3.1",
     "ezfunc": "git+https://github.com/anthonychu/ezfunc.git#main",
     "jsonwebtoken": "^8.5.1",
     "node-fetch": "^2.6.1"
