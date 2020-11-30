@@ -72,14 +72,14 @@ class StaticWebAppsClient {
         }
       }.bind(this),
       loginUrl: function(provider, redirectUrl) {
-        const url = `${this._apiBaseUrl}/.auth/login/${provider}`
+        let url = `${this._apiBaseUrl}/.auth/login/${provider}`
         if (redirectUrl) {
           url += `?post_login_redirect_uri=${encodeURIComponent(redirectUrl)}`
         }
         return url
       }.bind(this),
       logoutUrl: function(redirectUrl) {
-        const url = `${this._apiBaseUrl}/.auth/logout`
+        let url = `${this._apiBaseUrl}/.auth/logout`
         if (redirectUrl) {
           url += `?post_logout_redirect_uri=${encodeURIComponent(redirectUrl)}`
         }
