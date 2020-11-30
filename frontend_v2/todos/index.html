@@ -1,0 +1,186 @@
+<html>
+
+<head>
+  <title>Static Web Apps To-dos</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css" integrity="sha256-h20CPZ0QyXlBuAw7A+KluUYx/3pK+c7lYEpqLTlxjYQ=" crossorigin="anonymous" />
+  <style>
+    .slide-fade-enter-active,
+    .slide-fade-leave-active {
+      transition: all 1s ease;
+    }
+
+    .slide-fade-enter,
+    .slide-fade-leave-to {
+      height: 0px;
+      overflow-y: hidden;
+      opacity: 0;
+    }
+
+    .container {
+      max-width: 640px;
+    }
+
+    .todo-item {
+      margin-left: 12px;
+    }
+
+    .fa-trash-alt {
+      color: #999;
+    }
+    .fa-check-square, .fa-square {
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+  <p>&nbsp;</p>
+  <div id="app" class="container">
+    <div v-if="!authenticatedUser" class="jumbotron">
+      <h1>Welcome to Static Web Apps chat</h1>
+      <hr />
+      <button class="btn btn-dark btn-lg" v-on:click="login()">
+        <i class="fab fa-github"></i>&nbsp;
+        Sign in with GitHub
+      </button>
+    </div>
+    <div v-if="authenticatedUser">
+      <div class="row">
+        <div class="col-sm-9">
+          <h3>
+            <img src="https://docs.microsoft.com/en-us/azure/media/index/static-apps.svg" style="height: 32px" />
+            &nbsp;&nbsp;Static Web Apps To-Dos
+          </h3>
+        </div>
+        <div class="col-sm-3 text-right">
+          <a :href="`https://github.com/${authenticatedUser.userDetails}`">
+            <img :src="`https://github.com/${authenticatedUser.userDetails}.png`" style="width: 24px;" />
+            {{ authenticatedUser.userDetails }}
+          </a>
+          <a href="#" @click.prevent="logout" class="text-info small text-muted">[Logout]</a>
+        </div>
+      </div>
+
+      <div class="row" v-if="!ready">
+        <div class="col-sm">
+          <div>Loading...</div>
+        </div>
+      </div>
+      <div v-if="ready">
+        <div>
+          <hr />
+          <form v-on:submit.prevent="createTodo">
+            <input type="text" v-model="newTodo" class="form-control"
+              placeholder="Add a new item..." autocomplete="off" />
+          </form>
+        </div>
+        <transition-group name="slide-fade" class="list-group" tag="ul">
+          <li class="list-group-item" v-for="todo in todos" :key="todo._id">
+            <a href="#" @click.prevent="toggleCompleted(todo)"><i class="far fa-square" v-if="!todo.completed"></i><i class="far fa-check-square" v-if="todo.completed"></i></a>
+            <span class="todo-item">{{ todo.text }}</span>
+            <a href="#" class="float-right" @click.prevent="deleteTodo(todo)"><i class="far fa-trash-alt"></i></a>
+          </li>
+        </transition-group>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@3.1.4/dist/browser/signalr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/timeago.js@4.0.2/dist/timeago.min.js"></script>
+
+  <script src="../swa_v2.js"></script>
+
+  <script>
+    const isLocal = document.location.hostname === 'localhost'
+    const apiBaseUrl = isLocal ? 'http://localhost:7071' : ''
+
+    const swa = new StaticWebAppsClient(apiBaseUrl)
+
+    const app = new Vue({
+      el: '#app',
+
+      data() {
+        return {
+          newTodo: '',
+          todos: [],
+          ready: false,
+          authenticatedUser: null,
+          interval: null
+        }
+      },
+
+      methods: {
+        async createTodo() {
+          await swa.database().collection('todos').insertDocument({ text: this.newTodo, completed: false })
+          this.newTodo = ''
+        },
+
+        async toggleCompleted(todo) {
+          const updatedTodo = Object.assign({}, todo, {completed: !todo.completed})
+          await swa.database().collection('todos').replaceDocument(updatedTodo)
+        },
+
+        async deleteTodo(todo) {
+          await swa.database().collection('todos').deleteDocument(todo._id)
+        },
+
+        login() {
+          location.href = swa.auth().loginUrl('github', '/todos/')
+        },
+
+        logout() {
+          location.href = swa.auth().logoutUrl('/todos/')
+        },
+
+        onUpdate(change) {
+          const changedTodo = change.data
+          if (change.collection === 'todos') {
+            if (change.operation === 'deleteDocument') {
+              const index = this.todos.findIndex(t => t._id === changedTodo._id)
+              if (index >= 0) {
+                this.todos.splice(index, 1)
+              }
+            } else {
+              const todo = this.todos.find(t => t._id === changedTodo._id)
+              if (todo) {
+                Object.assign(todo, changedTodo)
+              } else {
+                this.todos.push(changedTodo)
+              }
+            }
+          }
+        }
+      },
+
+      async mounted() {
+        this.authenticatedUser = isLocal ? fakeUser() : await swa.auth().user()
+
+        if (this.authenticatedUser) {
+          const todos = await swa.database().collection('todos').findDocuments({}, { sort: {created: 1} })
+          for (const todo of todos) {
+            this.todos.push(todo)
+          }
+
+          await swa.realtime()
+            .onDatabaseUpdate(this.onUpdate)
+            .connect()
+
+          this.ready = true
+        }
+      }
+    })
+
+    function fakeUser() {
+      return {
+        identityProvider: "github",
+        userId: "17baeed9bn1sa3e5dbs24283",
+        userDetails: "testuser",
+        userRoles: ["admin", "anonymous", "authenticated"],
+      }
+    }
+  </script>
+</body>
+
+</html>

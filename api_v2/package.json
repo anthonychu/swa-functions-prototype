@@ -1,0 +1,19 @@
+{
+  "name": "api_v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "@sendgrid/mail": "^7.4.0",
+    "mongodb": "^3.6.3",
+    "swa-api": "git+https://github.com/anthonychu/swa-api.git#0.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "clean": "node node_modules/swa-api/dist/scripts/clean.js",
+    "generate": "npm run clean && node node_modules/swa-api/dist/scripts/generate.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
